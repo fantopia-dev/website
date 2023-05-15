@@ -3,7 +3,7 @@ the website of fantopia
 
 
 
-# depoly
+# deploy
 
 ```
 git clone https://github.com/fantopia-dev/website.git
