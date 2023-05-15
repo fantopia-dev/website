@@ -1,0 +1,15 @@
+syntax = "v1"
+
+type JoinWaitListReq {
+	Email string `json:"email"`
+    
+}
+
+@server(
+	prefix: api/v1
+	group: joinwaitlist
+)
+service waitlist-api {
+	@handler joinWaitList
+	post /joinwaitlist(JoinWaitListReq) returns (string)
+}
