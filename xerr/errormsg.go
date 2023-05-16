@@ -8,6 +8,7 @@ func init() {
 	message[SERVER_COMMON_ERROR] = "system error, try it later"
 	message[REUQEST_PARAM_ERROR] = "parameter error"
 	message[INVALID_EMAIL_ERROR] = "invalid email"
+	message[TOO_MANY_REQUEST_ERROR] = "request too frequently"
 }
 
 func MapErrMsg(errcode uint32) string {

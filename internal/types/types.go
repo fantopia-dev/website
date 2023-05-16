@@ -4,3 +4,8 @@ package types
 type JoinWaitListReq struct {
 	Email string `json:"email"`
 }
+
+type JoinWaitListResp struct {
+	Id         int  `json:"no"`
+	Duplicated bool `json:"duplicated"`
+}

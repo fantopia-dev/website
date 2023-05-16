@@ -9,6 +9,7 @@ services:
      - 8888:8888
     depends_on:
      - mysql
+     - redis
     networks:
       - website_network
 
@@ -17,11 +18,11 @@ services:
     container_name: mysql
     environment:
       # 时区上海 - Time zone Shanghai (Change if needed)
-     - TZ=Asia/Shanghai
-     - MYSQL_USER=root
-     - MYSQL_ROOT_PASSWORD=FUnxy7jdfYsxkdfs
-     - MYSQL_DATABASE=website
-     - MYSQL_ROOT_HOST=%
+     TZ: Asia/Shanghai
+     MYSQL_USER: root
+     MYSQL_ROOT_PASSWORD: FUnxy7jdfYsxkdfs
+     MYSQL_DATABASE: website
+     MYSQL_ROOT_HOST: '%'
     #  - MYSQL_ROOT_HOST=website
     ports:
       - 33068:3306
@@ -37,6 +38,23 @@ services:
     volumes:
       - ./data/mysql/data:/var/lib/mysql
       - ./doc/website-v1.0.sql:/docker-entrypoint-initdb.d/init.sql
+    privileged: true
+    restart: always
+    networks:
+      - website_network
+
+  redis:
+    image: redis:6.2.7
+    container_name: redis
+    ports:
+      - 36379:6379
+    environment:
+      # 时区上海 - Time zone Shanghai (Change if needed)
+      TZ: Asia/Shanghai
+    volumes:
+      # 数据文件 - data files
+      - ./data/redis/data:/data:rw
+    command: "redis-server --requirepass Tisd28478fhkhKSDFsdfk  --appendonly yes"
     privileged: true
     restart: always
     networks:

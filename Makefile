@@ -5,10 +5,9 @@ gen-api:
 	goctl api go --api ./desc/website.api --dir ./
 
 
-# no cache, only database
 .PHONY: gen-model
 gen-model:
-	goctl model mysql ddl -src="./doc/website-v1.0.sql" -dir="./model"
+	goctl model mysql ddl -src="./doc/website-v1.0.sql" -dir="./model" -c
 
 
 .PHONY: gen-dockerfile

@@ -8,3 +8,6 @@ Port: 8888
 
 MySql:
   DataSource: root:FUnxy7jdfYsxkdfs@tcp(172.29.0.1:33068)/website?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai
+CacheRedis:
+  - Host: 172.29.0.1:36379
+    Pass: Tisd28478fhkhKSDFsdfk

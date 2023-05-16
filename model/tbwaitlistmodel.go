@@ -1,6 +1,9 @@
 package model
 
-import "github.com/zeromicro/go-zero/core/stores/sqlx"
+import (
+	"github.com/zeromicro/go-zero/core/stores/cache"
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
+)
 
 var _ TbWaitlistModel = (*customTbWaitlistModel)(nil)
 
@@ -17,8 +20,8 @@ type (
 )
 
 // NewTbWaitlistModel returns a model for the database table.
-func NewTbWaitlistModel(conn sqlx.SqlConn) TbWaitlistModel {
+func NewTbWaitlistModel(conn sqlx.SqlConn, c cache.CacheConf) TbWaitlistModel {
 	return &customTbWaitlistModel{
-		defaultTbWaitlistModel: newTbWaitlistModel(conn),
+		defaultTbWaitlistModel: newTbWaitlistModel(conn, c),
 	}
 }

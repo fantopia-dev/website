@@ -2,7 +2,11 @@ syntax = "v1"
 
 type JoinWaitListReq {
 	Email string `json:"email"`
-    
+}
+
+type JoinWaitListResp {
+	Id         int  `json:"no"`
+	Duplicated bool `json:"duplicated"`
 }
 
 @server(
@@ -11,5 +15,5 @@ type JoinWaitListReq {
 )
 service waitlist-api {
 	@handler joinWaitList
-	post /joinwaitlist(JoinWaitListReq) returns (string)
+	post /joinwaitlist(JoinWaitListReq) returns (JoinWaitListResp)
 }

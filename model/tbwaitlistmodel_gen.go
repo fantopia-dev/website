@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/zeromicro/go-zero/core/stores/builder"
+	"github.com/zeromicro/go-zero/core/stores/cache"
 	"github.com/zeromicro/go-zero/core/stores/sqlc"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 	"github.com/zeromicro/go-zero/core/stringx"
@@ -20,6 +21,9 @@ var (
 	tbWaitlistRows                = strings.Join(tbWaitlistFieldNames, ",")
 	tbWaitlistRowsExpectAutoSet   = strings.Join(stringx.Remove(tbWaitlistFieldNames, "`id`", "`create_at`", "`create_time`", "`created_at`", "`update_at`", "`update_time`", "`updated_at`"), ",")
 	tbWaitlistRowsWithPlaceHolder = strings.Join(stringx.Remove(tbWaitlistFieldNames, "`id`", "`create_at`", "`create_time`", "`created_at`", "`update_at`", "`update_time`", "`updated_at`"), "=?,") + "=?"
+
+	cacheTbWaitlistIdPrefix    = "cache:tbWaitlist:id:"
+	cacheTbWaitlistEmailPrefix = "cache:tbWaitlist:email:"
 )
 
 type (
@@ -32,7 +36,7 @@ type (
 	}
 
 	defaultTbWaitlistModel struct {
-		conn  sqlx.SqlConn
+		sqlc.CachedConn
 		table string
 	}
 
@@ -44,23 +48,35 @@ type (
 	}
 )
 
-func newTbWaitlistModel(conn sqlx.SqlConn) *defaultTbWaitlistModel {
+func newTbWaitlistModel(conn sqlx.SqlConn, c cache.CacheConf) *defaultTbWaitlistModel {
 	return &defaultTbWaitlistModel{
-		conn:  conn,
-		table: "`tb_waitlist`",
+		CachedConn: sqlc.NewConn(conn, c),
+		table:      "`tb_waitlist`",
 	}
 }
 
 func (m *defaultTbWaitlistModel) Delete(ctx context.Context, id int64) error {
-	query := fmt.Sprintf("delete from %s where `id` = ?", m.table)
-	_, err := m.conn.ExecCtx(ctx, query, id)
+	data, err := m.FindOne(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	tbWaitlistEmailKey := fmt.Sprintf("%s%v", cacheTbWaitlistEmailPrefix, data.Email)
+	tbWaitlistIdKey := fmt.Sprintf("%s%v", cacheTbWaitlistIdPrefix, id)
+	_, err = m.ExecCtx(ctx, func(ctx context.Context, conn sqlx.SqlConn) (result sql.Result, err error) {
+		query := fmt.Sprintf("delete from %s where `id` = ?", m.table)
+		return conn.ExecCtx(ctx, query, id)
+	}, tbWaitlistEmailKey, tbWaitlistIdKey)
 	return err
 }
 
 func (m *defaultTbWaitlistModel) FindOne(ctx context.Context, id int64) (*TbWaitlist, error) {
-	query := fmt.Sprintf("select %s from %s where `id` = ? limit 1", tbWaitlistRows, m.table)
+	tbWaitlistIdKey := fmt.Sprintf("%s%v", cacheTbWaitlistIdPrefix, id)
 	var resp TbWaitlist
-	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
+	err := m.QueryRowCtx(ctx, &resp, tbWaitlistIdKey, func(ctx context.Context, conn sqlx.SqlConn, v any) error {
+		query := fmt.Sprintf("select %s from %s where `id` = ? limit 1", tbWaitlistRows, m.table)
+		return conn.QueryRowCtx(ctx, v, query, id)
+	})
 	switch err {
 	case nil:
 		return &resp, nil
@@ -72,9 +88,15 @@ func (m *defaultTbWaitlistModel) FindOne(ctx context.Context, id int64) (*TbWait
 }
 
 func (m *defaultTbWaitlistModel) FindOneByEmail(ctx context.Context, email string) (*TbWaitlist, error) {
+	tbWaitlistEmailKey := fmt.Sprintf("%s%v", cacheTbWaitlistEmailPrefix, email)
 	var resp TbWaitlist
-	query := fmt.Sprintf("select %s from %s where `email` = ? limit 1", tbWaitlistRows, m.table)
-	err := m.conn.QueryRowCtx(ctx, &resp, query, email)
+	err := m.QueryRowIndexCtx(ctx, &resp, tbWaitlistEmailKey, m.formatPrimary, func(ctx context.Context, conn sqlx.SqlConn, v any) (i any, e error) {
+		query := fmt.Sprintf("select %s from %s where `email` = ? limit 1", tbWaitlistRows, m.table)
+		if err := conn.QueryRowCtx(ctx, &resp, query, email); err != nil {
+			return nil, err
+		}
+		return resp.Id, nil
+	}, m.queryPrimary)
 	switch err {
 	case nil:
 		return &resp, nil
@@ -86,15 +108,37 @@ func (m *defaultTbWaitlistModel) FindOneByEmail(ctx context.Context, email strin
 }
 
 func (m *defaultTbWaitlistModel) Insert(ctx context.Context, data *TbWaitlist) (sql.Result, error) {
-	query := fmt.Sprintf("insert into %s (%s) values (?)", m.table, tbWaitlistRowsExpectAutoSet)
-	ret, err := m.conn.ExecCtx(ctx, query, data.Email)
+	tbWaitlistEmailKey := fmt.Sprintf("%s%v", cacheTbWaitlistEmailPrefix, data.Email)
+	tbWaitlistIdKey := fmt.Sprintf("%s%v", cacheTbWaitlistIdPrefix, data.Id)
+	ret, err := m.ExecCtx(ctx, func(ctx context.Context, conn sqlx.SqlConn) (result sql.Result, err error) {
+		query := fmt.Sprintf("insert into %s (%s) values (?)", m.table, tbWaitlistRowsExpectAutoSet)
+		return conn.ExecCtx(ctx, query, data.Email)
+	}, tbWaitlistEmailKey, tbWaitlistIdKey)
 	return ret, err
 }
 
 func (m *defaultTbWaitlistModel) Update(ctx context.Context, newData *TbWaitlist) error {
-	query := fmt.Sprintf("update %s set %s where `id` = ?", m.table, tbWaitlistRowsWithPlaceHolder)
-	_, err := m.conn.ExecCtx(ctx, query, newData.Email, newData.Id)
+	data, err := m.FindOne(ctx, newData.Id)
+	if err != nil {
+		return err
+	}
+
+	tbWaitlistEmailKey := fmt.Sprintf("%s%v", cacheTbWaitlistEmailPrefix, data.Email)
+	tbWaitlistIdKey := fmt.Sprintf("%s%v", cacheTbWaitlistIdPrefix, data.Id)
+	_, err = m.ExecCtx(ctx, func(ctx context.Context, conn sqlx.SqlConn) (result sql.Result, err error) {
+		query := fmt.Sprintf("update %s set %s where `id` = ?", m.table, tbWaitlistRowsWithPlaceHolder)
+		return conn.ExecCtx(ctx, query, newData.Email, newData.Id)
+	}, tbWaitlistEmailKey, tbWaitlistIdKey)
 	return err
+}
+
+func (m *defaultTbWaitlistModel) formatPrimary(primary any) string {
+	return fmt.Sprintf("%s%v", cacheTbWaitlistIdPrefix, primary)
+}
+
+func (m *defaultTbWaitlistModel) queryPrimary(ctx context.Context, conn sqlx.SqlConn, v, primary any) error {
+	query := fmt.Sprintf("select %s from %s where `id` = ? limit 1", tbWaitlistRows, m.table)
+	return conn.QueryRowCtx(ctx, v, query, primary)
 }
 
 func (m *defaultTbWaitlistModel) tableName() string {
