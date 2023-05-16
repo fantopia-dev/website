@@ -5,6 +5,8 @@ the website of fantopia
 
 # deploy
 
+initial deploy
+
 ```
 git clone https://github.com/fantopia-dev/website.git
 
@@ -14,6 +16,17 @@ docker-compose up -d
 
 # log
 docker-compose logs -f  website
+```
+
+
+update deploy
+
+```
+docker-compose stop
+
+docker-compose build website
+
+docker-compose up -d
 ```
 
 
