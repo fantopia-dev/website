@@ -38,25 +38,24 @@ func (l *JoinWaitListLogic) JoinWaitList(req *types.JoinWaitListReq) (*types.Joi
 		return nil, errors.Wrapf(xerr.NewErrCode(xerr.INVALID_EMAIL_ERROR), "invalid email")
 	}
 
+	// set a lock into redis, to fix concurrent issue
+	lock := redis.NewRedisLock(l.svcCtx.Redis, req.Email)
+	lock.SetExpire(5)
+	ok, err := lock.AcquireCtx(l.ctx)
+	if err != nil {
+		return nil, errors.Wrapf(xerr.NewErrCode(xerr.SERVER_COMMON_ERROR), "get redis lock error")
+	}
+	if !ok {
+		return nil, errors.Wrapf(xerr.NewErrCode(xerr.TOO_MANY_REQUEST_ERROR), "get redis lock failed")
+	}
+	logx.Info("====get redis lock ok")
+	// defer func() {
+	// 	lock.ReleaseCtx(l.ctx)
+	// 	logx.Info("======release redis lock")
+	// }()
+
 	// check exits
 	if one, err := l.svcCtx.TbWaitlistModel.FindOneByEmail(l.ctx, req.Email); err == nil {
-		// set a lock into redis, to fix concurrent issue
-		lock := redis.NewRedisLock(l.svcCtx.Redis, req.Email)
-		lock.SetExpire(5)
-		ok, err := lock.AcquireCtx(l.ctx)
-		if err != nil {
-			return nil, errors.Wrapf(xerr.NewErrCode(xerr.SERVER_COMMON_ERROR), "get redis lock error")
-		}
-		if !ok {
-			return nil, errors.Wrapf(xerr.NewErrCode(xerr.TOO_MANY_REQUEST_ERROR), "get redis lock failed")
-		}
-		logx.Info("====get redis lock ok")
-		// defer func() {
-		// 	lock.ReleaseCtx(l.ctx)
-		// 	logx.Info("======release redis lock")
-		// }()
-
-
 		resp.Duplicated = true
 		resp.Id = int(one.Id)
 		return &resp, nil
